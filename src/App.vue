@@ -1,51 +1,44 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
+import {
+  collection, onSnapshot, addDoc, updateDoc,
+  deleteDoc, doc, setDoc, query, orderBy
+} from 'firebase/firestore'
+import { db } from './firebase'
 import type { Place } from './types/place'
 import PlaceForm from './components/PlaceForm.vue'
 import PlaceCard from './components/PlaceCard.vue'
 
-const STORAGE_KEY = 'places-v1'
-
-const places = ref<Place[]>([])
+const places  = ref<Place[]>([])
+const loading = ref(true)
 const showForm = ref(false)
 const editingPlace = ref<Place | null>(null)
 
+let unsubscribe: (() => void) | null = null
+
 onMounted(() => {
-  const raw = localStorage.getItem(STORAGE_KEY)
-  if (!raw) return
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  places.value = (JSON.parse(raw) as any[]).map(p => ({
-    knownFor: '',
-    season: '',
-    website: '',
-    visitors: [],
-    ...p,
-    images: p.images ?? (p.image ? [p.image] : []),
-    // migrate old liked boolean to rating string
-    rating: p.rating ?? (p.liked === true ? 'would try again' : p.liked === false ? 'very bad' : '')
-  }))
+  const q = query(collection(db, 'places'), orderBy('createdAt', 'desc'))
+  unsubscribe = onSnapshot(q, snapshot => {
+    places.value = snapshot.docs.map(d => ({ ...d.data() as Omit<Place, 'id'>, id: d.id }))
+    loading.value = false
+  }, () => { loading.value = false })
 })
 
-function persist() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(places.value))
-}
+onUnmounted(() => unsubscribe?.())
 
-function addPlace(data: Omit<Place, 'id' | 'createdAt'>) {
-  places.value.unshift({ ...data, id: crypto.randomUUID(), createdAt: new Date().toISOString() })
-  persist()
+async function addPlace(data: Omit<Place, 'id' | 'createdAt'>) {
+  await addDoc(collection(db, 'places'), { ...data, createdAt: new Date().toISOString() })
   cancelForm()
 }
 
-function updatePlace(updated: Place) {
-  const idx = places.value.findIndex(p => p.id === updated.id)
-  if (idx !== -1) places.value[idx] = updated
-  persist()
+async function updatePlace(updated: Place) {
+  const { id, ...data } = updated
+  await updateDoc(doc(db, 'places', id), data)
   cancelForm()
 }
 
-function deletePlace(id: string) {
-  places.value = places.value.filter(p => p.id !== id)
-  persist()
+async function deletePlace(id: string) {
+  await deleteDoc(doc(db, 'places', id))
 }
 
 function startEdit(place: Place) {
@@ -58,15 +51,51 @@ function cancelForm() {
   showForm.value = false
   editingPlace.value = null
 }
+
+function exportData() {
+  const json = JSON.stringify(places.value, null, 2)
+  const blob = new Blob([json], { type: 'application/json' })
+  const url  = URL.createObjectURL(blob)
+  const a    = document.createElement('a')
+  a.href     = url
+  a.download = `places-${new Date().toISOString().slice(0, 10)}.json`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+function importData(e: Event) {
+  const file = (e.target as HTMLInputElement).files?.[0]
+  if (!file) return
+  const reader = new FileReader()
+  reader.onload = async (ev) => {
+    try {
+      const imported = JSON.parse(ev.target!.result as string) as Place[]
+      for (const place of imported) {
+        const { id, ...data } = place
+        // setDoc preserves the original id — re-importing the same file is safe
+        await setDoc(doc(db, 'places', id), data)
+      }
+    } catch {
+      alert('Invalid file — could not import.')
+    }
+  }
+  reader.readAsText(file)
+  ;(e.target as HTMLInputElement).value = ''
+}
 </script>
 
 <template>
   <div class="app">
     <header class="header">
       <h1 class="header__title">☕ Places</h1>
-      <button v-if="!showForm" class="add-btn" @click="showForm = true">
-        + Add Place
-      </button>
+      <div class="header__actions">
+        <button v-if="!showForm" class="add-btn" @click="showForm = true">+ Add</button>
+        <button v-if="places.length" class="icon-btn" title="Export" @click="exportData">↓</button>
+        <label class="icon-btn" title="Import">
+          ↑
+          <input type="file" accept=".json" hidden @change="importData" />
+        </label>
+      </div>
     </header>
 
     <main class="main">
@@ -80,11 +109,13 @@ function cancelForm() {
         />
       </Transition>
 
-      <p v-if="!places.length && !showForm" class="empty">
+      <div v-if="loading" class="loading">Loading…</div>
+
+      <p v-else-if="!places.length && !showForm" class="empty">
         🗺️ No places yet — add your first one!
       </p>
 
-      <div v-if="places.length" class="grid">
+      <div v-else-if="places.length" class="grid">
         <PlaceCard
           v-for="p in places"
           :key="p.id"
@@ -119,6 +150,12 @@ function cancelForm() {
     font-weight: 700;
     letter-spacing: -0.02em;
   }
+
+  &__actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
 }
 
 .add-btn {
@@ -130,16 +167,41 @@ function cancelForm() {
   font-weight: 700;
   font-size: 0.95rem;
   transition: background 0.15s;
+  cursor: pointer;
 
-  &:hover {
-    background: var(--accent-light);
-  }
+  &:hover { background: var(--accent-light); }
+}
+
+.icon-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.15);
+  border: none;
+  color: white;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s;
+  user-select: none;
+
+  &:hover { background: rgba(255, 255, 255, 0.28); }
 }
 
 .main {
   max-width: 1200px;
   margin: 0 auto;
   padding: 2rem 1.5rem;
+}
+
+.loading {
+  text-align: center;
+  color: var(--text-muted);
+  padding: 5rem 2rem;
+  font-size: 1rem;
 }
 
 .empty {
@@ -157,13 +219,7 @@ function cancelForm() {
 }
 
 .slide-enter-active,
-.slide-leave-active {
-  transition: all 0.25s ease;
-}
-
+.slide-leave-active { transition: all 0.25s ease; }
 .slide-enter-from,
-.slide-leave-to {
-  opacity: 0;
-  transform: translateY(-8px);
-}
+.slide-leave-to     { opacity: 0; transform: translateY(-8px); }
 </style>
