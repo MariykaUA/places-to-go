@@ -1,51 +1,44 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
+import {
+  collection, onSnapshot, addDoc, updateDoc,
+  deleteDoc, doc, setDoc, query, orderBy
+} from 'firebase/firestore'
+import { db } from './firebase'
 import type { Place } from './types/place'
 import PlaceForm from './components/PlaceForm.vue'
 import PlaceCard from './components/PlaceCard.vue'
 
-const STORAGE_KEY = 'places-v1'
-
-const places = ref<Place[]>([])
+const places  = ref<Place[]>([])
+const loading = ref(true)
 const showForm = ref(false)
 const editingPlace = ref<Place | null>(null)
-const importInput = ref<HTMLInputElement | null>(null)
+
+let unsubscribe: (() => void) | null = null
 
 onMounted(() => {
-  const raw = localStorage.getItem(STORAGE_KEY)
-  if (!raw) return
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  places.value = (JSON.parse(raw) as any[]).map(p => ({
-    knownFor: '',
-    season: '',
-    website: '',
-    visitors: [],
-    ...p,
-    images: p.images ?? (p.image ? [p.image] : []),
-    rating: p.rating ?? (p.liked === true ? 'would try again' : p.liked === false ? 'very bad' : '')
-  }))
+  const q = query(collection(db, 'places'), orderBy('createdAt', 'desc'))
+  unsubscribe = onSnapshot(q, snapshot => {
+    places.value = snapshot.docs.map(d => ({ ...d.data() as Omit<Place, 'id'>, id: d.id }))
+    loading.value = false
+  }, () => { loading.value = false })
 })
 
-function persist() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(places.value))
-}
+onUnmounted(() => unsubscribe?.())
 
-function addPlace(data: Omit<Place, 'id' | 'createdAt'>) {
-  places.value.unshift({ ...data, id: crypto.randomUUID(), createdAt: new Date().toISOString() })
-  persist()
+async function addPlace(data: Omit<Place, 'id' | 'createdAt'>) {
+  await addDoc(collection(db, 'places'), { ...data, createdAt: new Date().toISOString() })
   cancelForm()
 }
 
-function updatePlace(updated: Place) {
-  const idx = places.value.findIndex(p => p.id === updated.id)
-  if (idx !== -1) places.value[idx] = updated
-  persist()
+async function updatePlace(updated: Place) {
+  const { id, ...data } = updated
+  await updateDoc(doc(db, 'places', id), data)
   cancelForm()
 }
 
-function deletePlace(id: string) {
-  places.value = places.value.filter(p => p.id !== id)
-  persist()
+async function deletePlace(id: string) {
+  await deleteDoc(doc(db, 'places', id))
 }
 
 function startEdit(place: Place) {
@@ -62,9 +55,9 @@ function cancelForm() {
 function exportData() {
   const json = JSON.stringify(places.value, null, 2)
   const blob = new Blob([json], { type: 'application/json' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
+  const url  = URL.createObjectURL(blob)
+  const a    = document.createElement('a')
+  a.href     = url
   a.download = `places-${new Date().toISOString().slice(0, 10)}.json`
   a.click()
   URL.revokeObjectURL(url)
@@ -74,13 +67,14 @@ function importData(e: Event) {
   const file = (e.target as HTMLInputElement).files?.[0]
   if (!file) return
   const reader = new FileReader()
-  reader.onload = (ev) => {
+  reader.onload = async (ev) => {
     try {
       const imported = JSON.parse(ev.target!.result as string) as Place[]
-      const existingIds = new Set(places.value.map(p => p.id))
-      const newPlaces = imported.filter(p => !existingIds.has(p.id))
-      places.value = [...places.value, ...newPlaces]
-      persist()
+      for (const place of imported) {
+        const { id, ...data } = place
+        // setDoc preserves the original id — re-importing the same file is safe
+        await setDoc(doc(db, 'places', id), data)
+      }
     } catch {
       alert('Invalid file — could not import.')
     }
@@ -99,7 +93,7 @@ function importData(e: Event) {
         <button v-if="places.length" class="icon-btn" title="Export" @click="exportData">↓</button>
         <label class="icon-btn" title="Import">
           ↑
-          <input ref="importInput" type="file" accept=".json" hidden @change="importData" />
+          <input type="file" accept=".json" hidden @change="importData" />
         </label>
       </div>
     </header>
@@ -115,11 +109,13 @@ function importData(e: Event) {
         />
       </Transition>
 
-      <p v-if="!places.length && !showForm" class="empty">
+      <div v-if="loading" class="loading">Loading…</div>
+
+      <p v-else-if="!places.length && !showForm" class="empty">
         🗺️ No places yet — add your first one!
       </p>
 
-      <div v-if="places.length" class="grid">
+      <div v-else-if="places.length" class="grid">
         <PlaceCard
           v-for="p in places"
           :key="p.id"
@@ -173,9 +169,7 @@ function importData(e: Event) {
   transition: background 0.15s;
   cursor: pointer;
 
-  &:hover {
-    background: var(--accent-light);
-  }
+  &:hover { background: var(--accent-light); }
 }
 
 .icon-btn {
@@ -194,15 +188,20 @@ function importData(e: Event) {
   transition: background 0.15s;
   user-select: none;
 
-  &:hover {
-    background: rgba(255, 255, 255, 0.28);
-  }
+  &:hover { background: rgba(255, 255, 255, 0.28); }
 }
 
 .main {
   max-width: 1200px;
   margin: 0 auto;
   padding: 2rem 1.5rem;
+}
+
+.loading {
+  text-align: center;
+  color: var(--text-muted);
+  padding: 5rem 2rem;
+  font-size: 1rem;
 }
 
 .empty {
@@ -220,13 +219,7 @@ function importData(e: Event) {
 }
 
 .slide-enter-active,
-.slide-leave-active {
-  transition: all 0.25s ease;
-}
-
+.slide-leave-active { transition: all 0.25s ease; }
 .slide-enter-from,
-.slide-leave-to {
-  opacity: 0;
-  transform: translateY(-8px);
-}
+.slide-leave-to     { opacity: 0; transform: translateY(-8px); }
 </style>
