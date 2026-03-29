@@ -8,10 +8,21 @@ const STORAGE_KEY = 'places-v1'
 
 const places = ref<Place[]>([])
 const showForm = ref(false)
+const editingPlace = ref<Place | null>(null)
 
 onMounted(() => {
   const raw = localStorage.getItem(STORAGE_KEY)
-  if (raw) places.value = JSON.parse(raw)
+  if (!raw) return
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  places.value = (JSON.parse(raw) as any[]).map(p => ({
+    knownFor: '',
+    season: '',
+    website: '',
+    ...p,
+    images: p.images ?? (p.image ? [p.image] : []),
+    // migrate old liked boolean to rating string
+    rating: p.rating ?? (p.liked === true ? 'would try again' : p.liked === false ? 'very bad' : '')
+  }))
 })
 
 function persist() {
@@ -19,18 +30,32 @@ function persist() {
 }
 
 function addPlace(data: Omit<Place, 'id' | 'createdAt'>) {
-  places.value.unshift({
-    ...data,
-    id: crypto.randomUUID(),
-    createdAt: new Date().toISOString()
-  })
+  places.value.unshift({ ...data, id: crypto.randomUUID(), createdAt: new Date().toISOString() })
   persist()
-  showForm.value = false
+  cancelForm()
+}
+
+function updatePlace(updated: Place) {
+  const idx = places.value.findIndex(p => p.id === updated.id)
+  if (idx !== -1) places.value[idx] = updated
+  persist()
+  cancelForm()
 }
 
 function deletePlace(id: string) {
   places.value = places.value.filter(p => p.id !== id)
   persist()
+}
+
+function startEdit(place: Place) {
+  editingPlace.value = place
+  showForm.value = true
+  window.scrollTo({ top: 0, behavior: 'smooth' })
+}
+
+function cancelForm() {
+  showForm.value = false
+  editingPlace.value = null
 }
 </script>
 
@@ -47,8 +72,10 @@ function deletePlace(id: string) {
       <Transition name="slide">
         <PlaceForm
           v-if="showForm"
+          :place="editingPlace ?? undefined"
           @submit="addPlace"
-          @cancel="showForm = false"
+          @update="updatePlace"
+          @cancel="cancelForm"
         />
       </Transition>
 
@@ -61,6 +88,7 @@ function deletePlace(id: string) {
           v-for="p in places"
           :key="p.id"
           :place="p"
+          @edit="startEdit"
           @delete="deletePlace"
         />
       </div>
