@@ -9,6 +9,7 @@ const STORAGE_KEY = 'places-v1'
 const places = ref<Place[]>([])
 const showForm = ref(false)
 const editingPlace = ref<Place | null>(null)
+const importInput = ref<HTMLInputElement | null>(null)
 
 onMounted(() => {
   const raw = localStorage.getItem(STORAGE_KEY)
@@ -21,7 +22,6 @@ onMounted(() => {
     visitors: [],
     ...p,
     images: p.images ?? (p.image ? [p.image] : []),
-    // migrate old liked boolean to rating string
     rating: p.rating ?? (p.liked === true ? 'would try again' : p.liked === false ? 'very bad' : '')
   }))
 })
@@ -58,15 +58,50 @@ function cancelForm() {
   showForm.value = false
   editingPlace.value = null
 }
+
+function exportData() {
+  const json = JSON.stringify(places.value, null, 2)
+  const blob = new Blob([json], { type: 'application/json' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `places-${new Date().toISOString().slice(0, 10)}.json`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+function importData(e: Event) {
+  const file = (e.target as HTMLInputElement).files?.[0]
+  if (!file) return
+  const reader = new FileReader()
+  reader.onload = (ev) => {
+    try {
+      const imported = JSON.parse(ev.target!.result as string) as Place[]
+      const existingIds = new Set(places.value.map(p => p.id))
+      const newPlaces = imported.filter(p => !existingIds.has(p.id))
+      places.value = [...places.value, ...newPlaces]
+      persist()
+    } catch {
+      alert('Invalid file — could not import.')
+    }
+  }
+  reader.readAsText(file)
+  ;(e.target as HTMLInputElement).value = ''
+}
 </script>
 
 <template>
   <div class="app">
     <header class="header">
       <h1 class="header__title">☕ Places</h1>
-      <button v-if="!showForm" class="add-btn" @click="showForm = true">
-        + Add Place
-      </button>
+      <div class="header__actions">
+        <button v-if="!showForm" class="add-btn" @click="showForm = true">+ Add</button>
+        <button v-if="places.length" class="icon-btn" title="Export" @click="exportData">↓</button>
+        <label class="icon-btn" title="Import">
+          ↑
+          <input ref="importInput" type="file" accept=".json" hidden @change="importData" />
+        </label>
+      </div>
     </header>
 
     <main class="main">
@@ -119,6 +154,12 @@ function cancelForm() {
     font-weight: 700;
     letter-spacing: -0.02em;
   }
+
+  &__actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
 }
 
 .add-btn {
@@ -130,9 +171,31 @@ function cancelForm() {
   font-weight: 700;
   font-size: 0.95rem;
   transition: background 0.15s;
+  cursor: pointer;
 
   &:hover {
     background: var(--accent-light);
+  }
+}
+
+.icon-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.15);
+  border: none;
+  color: white;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s;
+  user-select: none;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.28);
   }
 }
 
