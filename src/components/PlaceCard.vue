@@ -20,7 +20,11 @@ const likedInfo = computed(() => {
   return null
 })
 
-const seasonClass = computed(() => props.place.season ? `season--${props.place.season}` : '')
+const seasonClass = computed(() => {
+  if (!props.place.season) return ''
+  const key = props.place.season === 'All seasons' ? 'All' : props.place.season
+  return `season--${key}`
+})
 
 const formattedDate = computed(() =>
   new Date(props.place.createdAt).toLocaleDateString('en-US', {
@@ -35,12 +39,15 @@ const extraCount = computed(() => props.place.images.length - 1)
   <article class="card">
     <div
       class="card__image"
-      :class="{ 'card__image--placeholder': !place.images.length, 'card__image--clickable': place.images.length }"
-      @click="place.images.length && openOverlay(0)"
+      :class="{ 'card__image--placeholder': !place.images.length }"
     >
-      <img v-if="place.images.length" :src="place.images[0]" :alt="place.name" />
+      <template v-if="place.images.length">
+        <img :src="place.images[0]" :alt="place.name" />
+        <button class="card__image-btn" aria-label="View photos" @click="openOverlay(0)">
+          <span>{{ extraCount > 0 ? `+${extraCount} more` : '🔍 View' }}</span>
+        </button>
+      </template>
       <span v-else>☕</span>
-      <span v-if="extraCount > 0" class="card__more">+{{ extraCount }} more</span>
     </div>
 
     <div class="card__body">
@@ -49,7 +56,9 @@ const extraCount = computed(() => props.place.images.length - 1)
           <h3 class="card__name">{{ place.name }}</h3>
           <div class="card__meta">
             <span v-if="place.type" class="card__type">{{ place.type }}</span>
-            <span v-if="place.season" class="card__season" :class="seasonClass">{{ place.season }}</span>
+            <span v-if="place.season" class="card__season" :class="seasonClass">
+              {{ place.season === 'All' ? 'All seasons' : place.season }}
+            </span>
           </div>
         </div>
         <span v-if="likedInfo" class="card__liked" :class="likedInfo.cls">{{ likedInfo.label }}</span>
@@ -134,26 +143,39 @@ const extraCount = computed(() => props.place.images.length - 1)
       font-size: 3rem;
     }
 
-    &--clickable {
-      cursor: pointer;
-
-      &:hover img {
-        transform: scale(1.03);
-      }
+    &:hover img {
+      transform: scale(1.03);
     }
   }
 
-  &__more {
+  &__image-btn {
     position: absolute;
-    bottom: 0.5rem;
-    right: 0.5rem;
-    background: rgba(0, 0, 0, 0.6);
-    color: white;
-    font-size: 0.75rem;
-    font-weight: 600;
-    padding: 0.2rem 0.55rem;
-    border-radius: 20px;
-    backdrop-filter: blur(4px);
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: flex-end;
+    justify-content: flex-end;
+    padding: 0.5rem;
+
+    span {
+      background: rgba(0, 0, 0, 0.6);
+      color: white;
+      font-size: 0.75rem;
+      font-weight: 600;
+      padding: 0.2rem 0.55rem;
+      border-radius: 20px;
+      backdrop-filter: blur(4px);
+      opacity: 0;
+      transition: opacity 0.15s;
+    }
+  }
+
+  &__image:hover &__image-btn span {
+    opacity: 1;
   }
 
   &__body {
@@ -204,10 +226,11 @@ const extraCount = computed(() => props.place.images.length - 1)
     padding: 0.1rem 0.5rem;
     border-radius: 20px;
 
-    &.season--Spring { background: #e8f5e9; color: #2e7d32; }
-    &.season--Summer { background: #fff8e1; color: #e65100; }
-    &.season--Autumn { background: #fff3e0; color: #bf360c; }
-    &.season--Winter { background: #e3f2fd; color: #1565c0; }
+    &.season--Spring     { background: #e8f5e9; color: #2e7d32; }
+    &.season--Summer     { background: #fff8e1; color: #e65100; }
+    &.season--Autumn     { background: #fff3e0; color: #bf360c; }
+    &.season--Winter     { background: #e3f2fd; color: #1565c0; }
+    &.season--All        { background: #f3e8ff; color: #6b21a8; }
   }
 
   &__liked {

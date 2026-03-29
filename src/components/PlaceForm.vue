@@ -10,7 +10,13 @@ const emit = defineEmits<{
 }>()
 
 const TYPES = ['Cafe', 'Restaurant', 'Bar', 'Coworking', 'Library', 'Other']
-const SEASONS = ['Spring', 'Summer', 'Autumn', 'Winter']
+const SEASONS = [
+  { value: 'Spring', label: 'Spring' },
+  { value: 'Summer', label: 'Summer' },
+  { value: 'Autumn', label: 'Autumn' },
+  { value: 'Winter', label: 'Winter' },
+  { value: 'All',    label: 'All seasons' }
+]
 
 const name = ref('')
 const images = ref<string[]>([])
@@ -124,13 +130,13 @@ function handleSubmit() {
         <div class="season-btns">
           <button
             v-for="s in SEASONS"
-            :key="s"
+            :key="s.value"
             class="season-btn"
-            :class="[`season-btn--${s}`, { 'season-btn--active': season === s }]"
+            :class="[`season-btn--${s.value}`, { 'season-btn--active': season === s.value }]"
             type="button"
-            @click="season = season === s ? '' : s"
+            @click="season = season === s.value ? '' : s.value"
           >
-            {{ s }}
+            {{ s.label }}
           </button>
         </div>
       </div>
@@ -363,6 +369,7 @@ function handleSubmit() {
   &--Summer { &.season-btn--active { background: #fff8e1; border-color: #ffb300; color: #e65100; } }
   &--Autumn { &.season-btn--active { background: #fff3e0; border-color: #ff7043; color: #bf360c; } }
   &--Winter { &.season-btn--active { background: #e3f2fd; border-color: #42a5f5; color: #1565c0; } }
+  &--All    { &.season-btn--active { background: #f3e8ff; border-color: #a855f7; color: #6b21a8; } }
 }
 
 .liked-btns {
