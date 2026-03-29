@@ -10,27 +10,33 @@ const emit = defineEmits<{
 }>()
 
 const TYPES = ['Cafe', 'Restaurant', 'Bar', 'Coworking', 'Library', 'Other']
+const SEASONS = ['Spring', 'Summer', 'Autumn', 'Winter']
 
 const name = ref('')
-const image = ref('')
-const imagePreview = ref('')
+const images = ref<string[]>([])
 const address = ref('')
 const liked = ref<boolean | null>(null)
 const type = ref('')
+const knownFor = ref('')
+const season = ref('')
+const website = ref('')
 const notes = ref('')
 const visitors = ref<string[]>([])
 const visitorInput = ref('')
 const nameError = ref(false)
 
-function onImageChange(e: Event) {
-  const file = (e.target as HTMLInputElement).files?.[0]
-  if (!file) return
-  const reader = new FileReader()
-  reader.onload = (ev) => {
-    image.value = ev.target!.result as string
-    imagePreview.value = image.value
-  }
-  reader.readAsDataURL(file)
+function onImagesChange(e: Event) {
+  const files = Array.from((e.target as HTMLInputElement).files ?? [])
+  files.forEach(file => {
+    const reader = new FileReader()
+    reader.onload = (ev) => images.value.push(ev.target!.result as string)
+    reader.readAsDataURL(file)
+  })
+  ;(e.target as HTMLInputElement).value = ''
+}
+
+function removeImage(i: number) {
+  images.value.splice(i, 1)
 }
 
 function addVisitor() {
@@ -57,10 +63,13 @@ function handleSubmit() {
   }
   emit('submit', {
     name: name.value.trim(),
-    image: image.value,
+    images: [...images.value],
     address: address.value.trim(),
     liked: liked.value,
     type: type.value,
+    knownFor: knownFor.value.trim(),
+    season: season.value,
+    website: website.value.trim(),
     notes: notes.value.trim(),
     visitors: [...visitors.value]
   })
@@ -92,15 +101,50 @@ function handleSubmit() {
       </div>
     </div>
 
-    <div class="field">
-      <label class="field__label">Address</label>
-      <input v-model="address" class="field__input" placeholder="123 Main St, City" />
+    <div class="row">
+      <div class="field">
+        <label class="field__label">Address</label>
+        <input v-model="address" class="field__input" placeholder="123 Main St, City" />
+      </div>
+
+      <div class="field">
+        <label class="field__label">Website</label>
+        <input v-model="website" class="field__input" type="url" placeholder="https://..." />
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="field">
+        <label class="field__label">Known for</label>
+        <input v-model="knownFor" class="field__input" placeholder="e.g. Best espresso, cozy vibe..." />
+      </div>
+
+      <div class="field">
+        <label class="field__label">Best season</label>
+        <div class="season-btns">
+          <button
+            v-for="s in SEASONS"
+            :key="s"
+            class="season-btn"
+            :class="[`season-btn--${s}`, { 'season-btn--active': season === s }]"
+            type="button"
+            @click="season = season === s ? '' : s"
+          >
+            {{ s }}
+          </button>
+        </div>
+      </div>
     </div>
 
     <div class="field">
-      <label class="field__label">Image</label>
-      <input type="file" accept="image/*" class="field__file" @change="onImageChange" />
-      <img v-if="imagePreview" :src="imagePreview" class="field__preview" alt="Preview" />
+      <label class="field__label">Photos</label>
+      <input type="file" accept="image/*" multiple class="field__file" @change="onImagesChange" />
+      <div v-if="images.length" class="image-grid">
+        <div v-for="(img, i) in images" :key="i" class="image-thumb">
+          <img :src="img" :alt="`Photo ${i + 1}`" />
+          <button class="image-thumb__remove" type="button" aria-label="Remove" @click="removeImage(i)">✕</button>
+        </div>
+      </div>
     </div>
 
     <div class="field">
@@ -237,15 +281,6 @@ function handleSubmit() {
     cursor: pointer;
   }
 
-  &__preview {
-    margin-top: 0.5rem;
-    width: 100%;
-    max-height: 200px;
-    object-fit: cover;
-    border-radius: var(--radius-sm);
-    border: 1px solid var(--border);
-  }
-
   &__error {
     font-size: 0.8rem;
     color: var(--liked-no);
@@ -254,6 +289,80 @@ function handleSubmit() {
   &--error .field__input {
     border-color: var(--liked-no);
   }
+}
+
+.image-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.image-thumb {
+  position: relative;
+  width: 80px;
+  height: 80px;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  border: 1px solid var(--border);
+
+  img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  &__remove {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    background: rgba(0, 0, 0, 0.55);
+    border: none;
+    color: white;
+    font-size: 0.75rem;
+    width: 1.4rem;
+    height: 1.4rem;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s;
+
+    &:hover {
+      background: var(--liked-no);
+    }
+  }
+}
+
+.season-btns {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.season-btn {
+  padding: 0.35rem 0.8rem;
+  border-radius: 20px;
+  border: 1.5px solid var(--border);
+  background: var(--bg);
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  transition: all 0.15s;
+
+  &:hover {
+    border-color: var(--accent);
+    color: var(--text);
+  }
+
+  &--active {
+    font-weight: 600;
+  }
+
+  &--Spring { &.season-btn--active { background: #e8f5e9; border-color: #4caf50; color: #2e7d32; } }
+  &--Summer { &.season-btn--active { background: #fff8e1; border-color: #ffb300; color: #e65100; } }
+  &--Autumn { &.season-btn--active { background: #fff3e0; border-color: #ff7043; color: #bf360c; } }
+  &--Winter { &.season-btn--active { background: #e3f2fd; border-color: #42a5f5; color: #1565c0; } }
 }
 
 .liked-btns {
@@ -270,33 +379,17 @@ function handleSubmit() {
   font-size: 0.9rem;
   transition: all 0.15s;
 
-  &:hover {
-    background: var(--accent-light);
-  }
+  &:hover { background: var(--accent-light); }
 
-  &--yes {
-    background: var(--liked-yes-bg);
-    border-color: var(--liked-yes);
-    color: var(--liked-yes);
-    font-weight: 600;
-  }
-
-  &--no {
-    background: var(--liked-no-bg);
-    border-color: var(--liked-no);
-    color: var(--liked-no);
-    font-weight: 600;
-  }
+  &--yes { background: var(--liked-yes-bg); border-color: var(--liked-yes); color: var(--liked-yes); font-weight: 600; }
+  &--no  { background: var(--liked-no-bg);  border-color: var(--liked-no);  color: var(--liked-no);  font-weight: 600; }
 }
 
 .visitor-row {
   display: flex;
   gap: 0.5rem;
 
-  .field__input {
-    flex: 1;
-    margin: 0;
-  }
+  .field__input { flex: 1; margin: 0; }
 }
 
 .visitor-add {
@@ -309,10 +402,7 @@ function handleSubmit() {
   font-size: 0.9rem;
   transition: all 0.15s;
 
-  &:hover {
-    background: var(--accent);
-    color: white;
-  }
+  &:hover { background: var(--accent); color: white; }
 }
 
 .tags {
@@ -342,9 +432,7 @@ function handleSubmit() {
     padding: 0;
     transition: color 0.15s;
 
-    &:hover {
-      color: var(--liked-no);
-    }
+    &:hover { color: var(--liked-no); }
   }
 }
 
@@ -360,19 +448,13 @@ function handleSubmit() {
     background: transparent;
     color: var(--text-muted);
     border: 1.5px solid var(--border);
-
-    &:hover {
-      background: var(--border);
-    }
+    &:hover { background: var(--border); }
   }
 
   &--save {
     background: var(--primary);
     color: white;
-
-    &:hover {
-      background: var(--primary-hover);
-    }
+    &:hover { background: var(--primary-hover); }
   }
 }
 </style>
