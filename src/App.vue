@@ -11,7 +11,16 @@ const showForm = ref(false)
 
 onMounted(() => {
   const raw = localStorage.getItem(STORAGE_KEY)
-  if (raw) places.value = JSON.parse(raw)
+  if (!raw) return
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  places.value = (JSON.parse(raw) as any[]).map(p => ({
+    knownFor: '',
+    season: '',
+    website: '',
+    ...p,
+    // migrate old single-image format to array
+    images: p.images ?? (p.image ? [p.image] : [])
+  }))
 })
 
 function persist() {
