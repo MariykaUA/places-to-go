@@ -4,7 +4,7 @@ import type { Place } from '../types/place'
 import ImageOverlay from './ImageOverlay.vue'
 
 const props = defineProps<{ place: Place }>()
-const emit = defineEmits<{ delete: [id: string] }>()
+const emit = defineEmits<{ delete: [id: string]; edit: [place: Place] }>()
 
 const overlayOpen = ref(false)
 const overlayIndex = ref(0)
@@ -14,11 +14,16 @@ function openOverlay(index = 0) {
   overlayOpen.value = true
 }
 
-const likedInfo = computed(() => {
-  if (props.place.liked === true) return { label: 'Liked', cls: 'liked--yes' }
-  if (props.place.liked === false) return { label: "Didn't like", cls: 'liked--no' }
-  return null
-})
+const RATING_MAP: Record<string, { label: string; cls: string }> = {
+  'amazing':         { label: '🌟 Amazing',         cls: 'rating--amazing' },
+  'would try again': { label: '👍 Would try again',  cls: 'rating--would-try' },
+  'okay..':          { label: '😐 Okay..',           cls: 'rating--okay' },
+  'nothing special': { label: '🤷 Nothing special',  cls: 'rating--nothing' },
+  'very bad':        { label: '👎 Very bad',          cls: 'rating--bad' },
+  'not visited':     { label: '🗺️ Not visited',       cls: 'rating--not-visited' }
+}
+
+const ratingInfo = computed(() => RATING_MAP[props.place.rating] ?? null)
 
 const seasonClass = computed(() => {
   if (!props.place.season) return ''
@@ -61,7 +66,7 @@ const extraCount = computed(() => props.place.images.length - 1)
             </span>
           </div>
         </div>
-        <span v-if="likedInfo" class="card__liked" :class="likedInfo.cls">{{ likedInfo.label }}</span>
+        <span v-if="ratingInfo" class="card__rating" :class="ratingInfo.cls">{{ ratingInfo.label }}</span>
       </div>
 
       <p v-if="place.knownFor" class="card__known-for">
@@ -93,7 +98,10 @@ const extraCount = computed(() => props.place.images.length - 1)
 
       <div class="card__footer">
         <span class="card__date">{{ formattedDate }}</span>
-        <button class="delete-btn" @click="emit('delete', place.id)">Delete</button>
+        <div class="card__actions">
+          <button class="edit-btn" @click="emit('edit', place)">Edit</button>
+          <button class="delete-btn" @click="emit('delete', place.id)">Delete</button>
+        </div>
       </div>
     </div>
 
@@ -233,15 +241,20 @@ const extraCount = computed(() => props.place.images.length - 1)
     &.season--All        { background: #f3e8ff; color: #6b21a8; }
   }
 
-  &__liked {
+  &__rating {
     flex-shrink: 0;
-    font-size: 0.75rem;
+    font-size: 0.72rem;
     font-weight: 600;
     padding: 0.2rem 0.6rem;
     border-radius: 20px;
+    white-space: nowrap;
 
-    &.liked--yes { background: var(--liked-yes-bg); color: var(--liked-yes); }
-    &.liked--no  { background: var(--liked-no-bg);  color: var(--liked-no);  }
+    &.rating--amazing    { background: #e8f5ee; color: #2d7a4f; }
+    &.rating--would-try  { background: #e8f5f1; color: #1a7a5e; }
+    &.rating--okay       { background: #fef3c7; color: #92400e; }
+    &.rating--nothing    { background: #f3f4f6; color: #4b5563; }
+    &.rating--bad        { background: #fdecea; color: #c0392b; }
+    &.rating--not-visited{ background: #efeff5; color: #5b5b7a; }
   }
 
   &__known-for {
@@ -304,6 +317,11 @@ const extraCount = computed(() => props.place.images.length - 1)
     font-size: 0.8rem;
     color: var(--text-muted);
   }
+
+  &__actions {
+    display: flex;
+    gap: 0.4rem;
+  }
 }
 
 .tags {
@@ -319,6 +337,23 @@ const extraCount = computed(() => props.place.images.length - 1)
   font-size: 0.8rem;
   color: var(--primary);
   font-weight: 500;
+}
+
+.edit-btn {
+  font-size: 0.8rem;
+  padding: 0.25rem 0.65rem;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  font-weight: 500;
+  transition: all 0.15s;
+
+  &:hover {
+    background: var(--accent-light);
+    border-color: var(--accent);
+    color: var(--primary);
+  }
 }
 
 .delete-btn {

@@ -1,13 +1,18 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import type { Place } from '../types/place'
 
 type PlaceInput = Omit<Place, 'id' | 'createdAt'>
 
+const props = defineProps<{ place?: Place }>()
+
 const emit = defineEmits<{
-  submit: [place: PlaceInput]
+  submit: [data: PlaceInput]
+  update: [place: Place]
   cancel: []
 }>()
+
+const isEditing = computed(() => !!props.place)
 
 const TYPES = ['Cafe', 'Restaurant', 'Bar', 'Coworking', 'Library', 'Other']
 const SEASONS = [
@@ -17,19 +22,27 @@ const SEASONS = [
   { value: 'Winter', label: 'Winter' },
   { value: 'All',    label: 'All seasons' }
 ]
+const RATINGS = [
+  { value: 'amazing',          label: 'Amazing',          emoji: '🌟' },
+  { value: 'would try again',  label: 'Would try again',  emoji: '👍' },
+  { value: 'okay..',           label: 'Okay..',           emoji: '😐' },
+  { value: 'nothing special',  label: 'Nothing special',  emoji: '🤷' },
+  { value: 'very bad',         label: 'Very bad',         emoji: '👎' },
+  { value: 'not visited',      label: 'Not visited',      emoji: '🗺️' }
+]
 
-const name = ref('')
-const images = ref<string[]>([])
-const address = ref('')
-const liked = ref<boolean | null>(null)
-const type = ref('')
-const knownFor = ref('')
-const season = ref('')
-const website = ref('')
-const notes = ref('')
-const visitors = ref<string[]>([])
+const name        = ref(props.place?.name        ?? '')
+const images      = ref<string[]>([...(props.place?.images ?? [])])
+const address     = ref(props.place?.address     ?? '')
+const rating      = ref(props.place?.rating      ?? '')
+const type        = ref(props.place?.type        ?? '')
+const knownFor    = ref(props.place?.knownFor    ?? '')
+const season      = ref(props.place?.season      ?? '')
+const website     = ref(props.place?.website     ?? '')
+const notes       = ref(props.place?.notes       ?? '')
+const visitors    = ref<string[]>([...(props.place?.visitors ?? [])])
 const visitorInput = ref('')
-const nameError = ref(false)
+const nameError   = ref(false)
 
 function onImagesChange(e: Event) {
   const files = Array.from((e.target as HTMLInputElement).files ?? [])
@@ -56,35 +69,34 @@ function removeVisitor(v: string) {
 }
 
 function onVisitorKey(e: KeyboardEvent) {
-  if (e.key === 'Enter') {
-    e.preventDefault()
-    addVisitor()
-  }
+  if (e.key === 'Enter') { e.preventDefault(); addVisitor() }
 }
 
 function handleSubmit() {
-  if (!name.value.trim()) {
-    nameError.value = true
-    return
-  }
-  emit('submit', {
-    name: name.value.trim(),
-    images: [...images.value],
-    address: address.value.trim(),
-    liked: liked.value,
-    type: type.value,
+  if (!name.value.trim()) { nameError.value = true; return }
+  const data: PlaceInput = {
+    name:     name.value.trim(),
+    images:   [...images.value],
+    address:  address.value.trim(),
+    rating:   rating.value,
+    type:     type.value,
     knownFor: knownFor.value.trim(),
-    season: season.value,
-    website: website.value.trim(),
-    notes: notes.value.trim(),
+    season:   season.value,
+    website:  website.value.trim(),
+    notes:    notes.value.trim(),
     visitors: [...visitors.value]
-  })
+  }
+  if (isEditing.value) {
+    emit('update', { ...props.place!, ...data })
+  } else {
+    emit('submit', data)
+  }
 }
 </script>
 
 <template>
   <div class="form">
-    <h2 class="form__title">Add a Place</h2>
+    <h2 class="form__title">{{ isEditing ? 'Edit Place' : 'Add a Place' }}</h2>
 
     <div class="row">
       <div class="field" :class="{ 'field--error': nameError }">
@@ -154,23 +166,18 @@ function handleSubmit() {
     </div>
 
     <div class="field">
-      <label class="field__label">Did you like it?</label>
-      <div class="liked-btns">
+      <label class="field__label">How was it?</label>
+      <div class="rating-grid">
         <button
-          class="liked-btn"
-          :class="{ 'liked-btn--yes': liked === true }"
+          v-for="r in RATINGS"
+          :key="r.value"
+          class="rating-btn"
+          :class="[`rating-btn--${r.value.replace(/\s+/g, '-')}`, { 'rating-btn--active': rating === r.value }]"
           type="button"
-          @click="liked = liked === true ? null : true"
+          @click="rating = rating === r.value ? '' : r.value"
         >
-          👍 Liked
-        </button>
-        <button
-          class="liked-btn"
-          :class="{ 'liked-btn--no': liked === false }"
-          type="button"
-          @click="liked = liked === false ? null : false"
-        >
-          👎 Didn't like
+          <span class="rating-btn__emoji">{{ r.emoji }}</span>
+          <span class="rating-btn__label">{{ r.label }}</span>
         </button>
       </div>
     </div>
@@ -206,7 +213,9 @@ function handleSubmit() {
 
     <div class="form__actions">
       <button class="btn btn--cancel" type="button" @click="emit('cancel')">Cancel</button>
-      <button class="btn btn--save" type="button" @click="handleSubmit">Save Place</button>
+      <button class="btn btn--save" type="button" @click="handleSubmit">
+        {{ isEditing ? 'Save Changes' : 'Save Place' }}
+      </button>
     </div>
   </div>
 </template>
@@ -242,9 +251,7 @@ function handleSubmit() {
   grid-template-columns: 1fr 1fr;
   gap: 1rem;
 
-  @media (max-width: 560px) {
-    grid-template-columns: 1fr;
-  }
+  @media (max-width: 560px) { grid-template-columns: 1fr; }
 }
 
 .field {
@@ -271,15 +278,10 @@ function handleSubmit() {
     outline: none;
     transition: border-color 0.15s;
 
-    &:focus {
-      border-color: var(--accent);
-    }
+    &:focus { border-color: var(--accent); }
   }
 
-  &__textarea {
-    resize: vertical;
-    min-height: 80px;
-  }
+  &__textarea { resize: vertical; min-height: 80px; }
 
   &__file {
     font-size: 0.9rem;
@@ -287,14 +289,9 @@ function handleSubmit() {
     cursor: pointer;
   }
 
-  &__error {
-    font-size: 0.8rem;
-    color: var(--liked-no);
-  }
+  &__error { font-size: 0.8rem; color: var(--liked-no); }
 
-  &--error .field__input {
-    border-color: var(--liked-no);
-  }
+  &--error .field__input { border-color: var(--liked-no); }
 }
 
 .image-grid {
@@ -312,11 +309,7 @@ function handleSubmit() {
   overflow: hidden;
   border: 1px solid var(--border);
 
-  img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-  }
+  img { width: 100%; height: 100%; object-fit: cover; }
 
   &__remove {
     position: absolute;
@@ -334,10 +327,45 @@ function handleSubmit() {
     justify-content: center;
     transition: background 0.15s;
 
-    &:hover {
-      background: var(--liked-no);
-    }
+    &:hover { background: var(--liked-no); }
   }
+}
+
+.rating-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.5rem;
+
+  @media (max-width: 560px) { grid-template-columns: repeat(2, 1fr); }
+}
+
+.rating-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.6rem 0.5rem;
+  border-radius: var(--radius-sm);
+  border: 1.5px solid var(--border);
+  background: var(--bg);
+  cursor: pointer;
+  transition: all 0.15s;
+
+  &__emoji { font-size: 1.3rem; line-height: 1; }
+  &__label { font-size: 0.75rem; font-weight: 500; color: var(--text-muted); text-align: center; }
+
+  &:hover { border-color: var(--accent); background: var(--accent-light); }
+
+  &--active {
+    .rating-btn__label { font-weight: 700; }
+  }
+
+  &--amazing         { &.rating-btn--active { background: #e8f5ee; border-color: #2d7a4f; .rating-btn__label { color: #2d7a4f; } } }
+  &--would-try-again { &.rating-btn--active { background: #e8f5f1; border-color: #1a7a5e; .rating-btn__label { color: #1a7a5e; } } }
+  &--okay\.\.        { &.rating-btn--active { background: #fef3c7; border-color: #b45309; .rating-btn__label { color: #92400e; } } }
+  &--nothing-special { &.rating-btn--active { background: #f3f4f6; border-color: #9ca3af; .rating-btn__label { color: #4b5563; } } }
+  &--very-bad        { &.rating-btn--active { background: #fdecea; border-color: #c0392b; .rating-btn__label { color: #c0392b; } } }
+  &--not-visited     { &.rating-btn--active { background: #efeff5; border-color: #8b8baa; .rating-btn__label { color: #5b5b7a; } } }
 }
 
 .season-btns {
@@ -356,40 +384,14 @@ function handleSubmit() {
   color: var(--text-muted);
   transition: all 0.15s;
 
-  &:hover {
-    border-color: var(--accent);
-    color: var(--text);
-  }
-
-  &--active {
-    font-weight: 600;
-  }
+  &:hover { border-color: var(--accent); color: var(--text); }
+  &--active { font-weight: 600; }
 
   &--Spring { &.season-btn--active { background: #e8f5e9; border-color: #4caf50; color: #2e7d32; } }
   &--Summer { &.season-btn--active { background: #fff8e1; border-color: #ffb300; color: #e65100; } }
   &--Autumn { &.season-btn--active { background: #fff3e0; border-color: #ff7043; color: #bf360c; } }
   &--Winter { &.season-btn--active { background: #e3f2fd; border-color: #42a5f5; color: #1565c0; } }
   &--All    { &.season-btn--active { background: #f3e8ff; border-color: #a855f7; color: #6b21a8; } }
-}
-
-.liked-btns {
-  display: flex;
-  gap: 0.5rem;
-}
-
-.liked-btn {
-  padding: 0.5rem 1rem;
-  border-radius: var(--radius-sm);
-  border: 1.5px solid var(--border);
-  background: var(--bg);
-  color: var(--text);
-  font-size: 0.9rem;
-  transition: all 0.15s;
-
-  &:hover { background: var(--accent-light); }
-
-  &--yes { background: var(--liked-yes-bg); border-color: var(--liked-yes); color: var(--liked-yes); font-weight: 600; }
-  &--no  { background: var(--liked-no-bg);  border-color: var(--liked-no);  color: var(--liked-no);  font-weight: 600; }
 }
 
 .visitor-row {

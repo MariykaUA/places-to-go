@@ -3,7 +3,7 @@ export interface Place {
   name: string
   images: string[]
   address: string
-  liked: boolean | null
+  rating: string
   type: string
   knownFor: string
   season: string
