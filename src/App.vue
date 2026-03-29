@@ -18,6 +18,7 @@ onMounted(() => {
     knownFor: '',
     season: '',
     website: '',
+    visitors: [],
     ...p,
     images: p.images ?? (p.image ? [p.image] : []),
     // migrate old liked boolean to rating string
@@ -150,7 +151,7 @@ function cancelForm() {
 
 .grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr));
   gap: 1.5rem;
   margin-top: 1.5rem;
 }

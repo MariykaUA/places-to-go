@@ -158,9 +158,10 @@ const extraCount = computed(() => props.place.images.length - 1)
 
   &__image-btn {
     position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
     background: transparent;
     border: none;
     cursor: pointer;
@@ -176,9 +177,12 @@ const extraCount = computed(() => props.place.images.length - 1)
       font-weight: 600;
       padding: 0.2rem 0.55rem;
       border-radius: 20px;
-      backdrop-filter: blur(4px);
       opacity: 0;
       transition: opacity 0.15s;
+
+      @media (hover: none) {
+        opacity: 1;
+      }
     }
   }
 
