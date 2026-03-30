@@ -17,7 +17,7 @@ function openOverlay(index = 0) {
 const RATING_MAP: Record<string, { label: string; cls: string }> = {
   'amazing':         { label: '🌟 Amazing',         cls: 'rating--amazing' },
   'would try again': { label: '👍 Would try again',  cls: 'rating--would-try' },
-  'okay..':          { label: '😐 Okay..',           cls: 'rating--okay' },
+  'okay..':          { label: '😐 Okay.. If nowhere else',           cls: 'rating--okay' },
   'nothing special': { label: '🤷 Nothing special',  cls: 'rating--nothing' },
   'very bad':        { label: '👎 Very bad',          cls: 'rating--bad' },
   'not visited':     { label: '🗺️ Not visited',       cls: 'rating--not-visited' }
