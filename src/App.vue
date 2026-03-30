@@ -10,7 +10,6 @@ import PlaceForm from './components/PlaceForm.vue'
 import PlaceCard from './components/PlaceCard.vue'
 
 const places  = ref<Place[]>([])
-const loading = ref(true)
 const showForm = ref(false)
 const editingPlace = ref<Place | null>(null)
 
@@ -20,8 +19,7 @@ onMounted(() => {
   const q = query(collection(db, 'places'), orderBy('createdAt', 'desc'))
   unsubscribe = onSnapshot(q, snapshot => {
     places.value = snapshot.docs.map(d => ({ ...d.data() as Omit<Place, 'id'>, id: d.id }))
-    loading.value = false
-  }, () => { loading.value = false })
+  })
 })
 
 onUnmounted(() => unsubscribe?.())
@@ -86,13 +84,11 @@ function exportData() {
         />
       </Transition>
 
-      <div v-if="loading" class="loading">Loading…</div>
-
-      <p v-else-if="!places.length && !showForm" class="empty">
+      <p v-if="!places.length && !showForm" class="empty">
         🗺️ No places yet — add your first one!
       </p>
 
-      <div v-else-if="places.length" class="grid">
+      <div v-if="places.length" class="grid">
         <PlaceCard
           v-for="p in places"
           :key="p.id"
@@ -172,13 +168,6 @@ function exportData() {
   max-width: 1200px;
   margin: 0 auto;
   padding: 2rem 1.5rem;
-}
-
-.loading {
-  text-align: center;
-  color: var(--text-muted);
-  padding: 5rem 2rem;
-  font-size: 1rem;
 }
 
 .empty {
