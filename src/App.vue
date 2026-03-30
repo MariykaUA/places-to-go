@@ -2,7 +2,7 @@
 import { ref, onMounted, onUnmounted } from 'vue'
 import {
   collection, onSnapshot, addDoc, updateDoc,
-  deleteDoc, doc, setDoc, query, orderBy
+  deleteDoc, doc, query, orderBy
 } from 'firebase/firestore'
 import { db } from './firebase'
 import type { Place } from './types/place'
@@ -63,25 +63,6 @@ function exportData() {
   URL.revokeObjectURL(url)
 }
 
-function importData(e: Event) {
-  const file = (e.target as HTMLInputElement).files?.[0]
-  if (!file) return
-  const reader = new FileReader()
-  reader.onload = async (ev) => {
-    try {
-      const imported = JSON.parse(ev.target!.result as string) as Place[]
-      for (const place of imported) {
-        const { id, ...data } = place
-        // setDoc preserves the original id — re-importing the same file is safe
-        await setDoc(doc(db, 'places', id), data)
-      }
-    } catch {
-      alert('Invalid file — could not import.')
-    }
-  }
-  reader.readAsText(file)
-  ;(e.target as HTMLInputElement).value = ''
-}
 </script>
 
 <template>
@@ -91,10 +72,6 @@ function importData(e: Event) {
       <div class="header__actions">
         <button v-if="!showForm" class="add-btn" @click="showForm = true">+ Add</button>
         <button v-if="places.length" class="icon-btn" title="Export" @click="exportData">↓</button>
-        <label class="icon-btn" title="Import">
-          ↑
-          <input type="file" accept=".json" hidden @change="importData" />
-        </label>
       </div>
     </header>
 
