@@ -6,7 +6,7 @@ export interface Place {
   rating: string
   type: string
   knownFor: string
-  season: string
+  seasons: string[]
   website: string
   notes: string
   visitors: string[]

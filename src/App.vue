@@ -50,17 +50,6 @@ function cancelForm() {
   editingPlace.value = null
 }
 
-function exportData() {
-  const json = JSON.stringify(places.value, null, 2)
-  const blob = new Blob([json], { type: 'application/json' })
-  const url  = URL.createObjectURL(blob)
-  const a    = document.createElement('a')
-  a.href     = url
-  a.download = `places-${new Date().toISOString().slice(0, 10)}.json`
-  a.click()
-  URL.revokeObjectURL(url)
-}
-
 </script>
 
 <template>
@@ -69,7 +58,6 @@ function exportData() {
       <h1 class="header__title">☕ Places</h1>
       <div class="header__actions">
         <button v-if="!showForm" class="add-btn" @click="showForm = true">+ Add</button>
-        <button v-if="places.length" class="icon-btn" title="Export" @click="exportData">↓</button>
       </div>
     </header>
 
@@ -143,25 +131,6 @@ function exportData() {
   cursor: pointer;
 
   &:hover { background: var(--accent-light); }
-}
-
-.icon-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 2rem;
-  height: 2rem;
-  border-radius: var(--radius-sm);
-  background: rgba(255, 255, 255, 0.15);
-  border: none;
-  color: white;
-  font-size: 1rem;
-  font-weight: 700;
-  cursor: pointer;
-  transition: background 0.15s;
-  user-select: none;
-
-  &:hover { background: rgba(255, 255, 255, 0.28); }
 }
 
 .main {

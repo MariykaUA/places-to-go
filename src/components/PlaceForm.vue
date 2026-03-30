@@ -37,7 +37,7 @@ const address     = ref(props.place?.address     ?? '')
 const rating      = ref(props.place?.rating      ?? '')
 const type        = ref(props.place?.type        ?? '')
 const knownFor    = ref(props.place?.knownFor    ?? '')
-const season      = ref(props.place?.season      ?? '')
+const seasons     = ref<string[]>([...(props.place?.seasons ?? [])])
 const website     = ref(props.place?.website     ?? '')
 const notes       = ref(props.place?.notes       ?? '')
 const visitors    = ref<string[]>([...(props.place?.visitors ?? [])])
@@ -100,7 +100,7 @@ function handleSubmit() {
     rating:   rating.value,
     type:     type.value,
     knownFor: knownFor.value.trim(),
-    season:   season.value,
+    seasons:  [...seasons.value],
     website:  website.value.trim(),
     notes:    notes.value.trim(),
     visitors: [...visitors.value]
@@ -163,9 +163,9 @@ function handleSubmit() {
             v-for="s in SEASONS"
             :key="s.value"
             class="season-btn"
-            :class="[`season-btn--${s.value}`, { 'season-btn--active': season === s.value }]"
+            :class="[`season-btn--${s.value}`, { 'season-btn--active': seasons.includes(s.value) }]"
             type="button"
-            @click="season = season === s.value ? '' : s.value"
+            @click="seasons.includes(s.value) ? seasons.splice(seasons.indexOf(s.value), 1) : seasons.push(s.value)"
           >
             {{ s.label }}
           </button>

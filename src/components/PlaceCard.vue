@@ -25,11 +25,9 @@ const RATING_MAP: Record<string, { label: string; cls: string }> = {
 
 const ratingInfo = computed(() => RATING_MAP[props.place.rating] ?? null)
 
-const seasonClass = computed(() => {
-  if (!props.place.season) return ''
-  const key = props.place.season === 'All seasons' ? 'All' : props.place.season
-  return `season--${key}`
-})
+function seasonClass(s: string) {
+  return `season--${s}`
+}
 
 const formattedDate = computed(() =>
   new Date(props.place.createdAt).toLocaleDateString('en-US', {
@@ -61,9 +59,12 @@ const extraCount = computed(() => props.place.images.length - 1)
           <h3 class="card__name">{{ place.name }}</h3>
           <div class="card__meta">
             <span v-if="place.type" class="card__type">{{ place.type }}</span>
-            <span v-if="place.season" class="card__season" :class="seasonClass">
-              {{ place.season === 'All' ? 'All seasons' : place.season }}
-            </span>
+            <span
+              v-for="s in (place.seasons ?? [])"
+              :key="s"
+              class="card__season"
+              :class="seasonClass(s)"
+            >{{ s === 'All' ? 'All seasons' : s }}</span>
           </div>
         </div>
         <span v-if="ratingInfo" class="card__rating" :class="ratingInfo.cls">{{ ratingInfo.label }}</span>
